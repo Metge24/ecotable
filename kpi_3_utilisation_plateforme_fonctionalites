@@ -18,3 +18,17 @@ SELECT
 FROM cast_date
 GROUP BY Name, year
 --HAVING Name != 'story_link_clicked'pour BtoB ou HAVING Name = 'story_link_clicked' pour BtoC
+
+
+-- taux click par type d'event)--
+WITH calcul_taux AS (SELECT
+  DISTINCT(Name) AS Name,
+  COUNT(ID) OVER(PARTITION BY Name) AS nb_click,
+  COUNT(ID) OVER () AS total_click
+FROM `projet_ecotable.tracking_event`)
+
+SELECT
+  Name,
+  nb_click/total_click AS taux_click
+FROM calcul_taux
+--HAVING Name != 'story_link_clicked'pour BtoB ou HAVING Name = 'story_link_clicked' pour BtoC--
