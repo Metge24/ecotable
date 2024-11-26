@@ -1,0 +1,60 @@
+-- Calculer Churn rate (Nbre désabonnements / Nbre Total d'abonnés au début de la période--
+--Table Subscription--
+
+  --Nombre Total abonnés actifs--
+ SELECT *
+FROM `rare-array-437909-t3.projet_data_ecotable.Subscriptions` 
+WHERE State = "active"
+
+ --Nombre Total abonnés entre 2022 et 2023--
+WITH cleaned_date AS (
+  SELECT
+    ID,
+    State,
+    REGEXP_REPLACE(Valid_Until, r', \d{2}:\d{2}', '') AS cleaned_valid_until,
+    REGEXP_REPLACE(Created_At, r', \d{2}:\d{2}', '') AS cleaned_created_at
+  FROM `rare-array-437909-t3.projet_data_ecotable.Subscriptions`
+),
+
+cast_date AS (
+  SELECT
+    ID,
+    State,
+    PARSE_DATE('%B %d, %Y', cleaned_valid_until) AS valid_until,
+    PARSE_DATE('%B %d, %Y', cleaned_created_at) AS created_at
+  FROM cleaned_date
+)
+
+SELECT ID,
+  valid_until,
+  created_at
+FROM cast_date
+WHERE EXTRACT(YEAR FROM valid_until) = 2023
+  AND EXTRACT(YEAR FROM created_at) = 2022;
+
+--Nombre de désabonnés enb 2023--
+
+  WITH cleaned_date AS (
+  SELECT
+    ID,
+    State,
+    REGEXP_REPLACE(Valid_Until, r', \d{2}:\d{2}', '') AS cleaned_valid_until,
+    REGEXP_REPLACE(Created_At, r', \d{2}:\d{2}', '') AS cleaned_created_at
+  FROM `rare-array-437909-t3.projet_data_ecotable.Subscriptions`
+),
+
+cast_date AS (
+  SELECT
+    ID,
+    State,
+    PARSE_DATE('%B %d, %Y', cleaned_valid_until) AS valid_until,
+    PARSE_DATE('%B %d, %Y', cleaned_created_at) AS created_at
+  FROM cleaned_date
+)
+
+SELECT ID,
+  valid_until,
+  created_at
+FROM cast_date
+WHERE EXTRACT(YEAR FROM valid_until) = 2023;
+
