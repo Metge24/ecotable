@@ -1,1 +1,20 @@
+-- Nb utilisation annuelle (nb clicks par an par type d'event)--
+WITH cleaned_date AS (SELECT
+  ID,
+  REGEXP_EXTRACT(Created_At, r'^[^,]+,\s*\d{4}') AS cleaned_created_at,
+  Name
+FROM `projet_ecotable.tracking_event`),
 
+cast_date AS (SELECT
+  ID,
+  CAST(cleaned_created_at AS DATE FORMAT 'MONTH DD, YYYY') AS created_at,
+  Name
+FROM cleaned_date)
+
+SELECT
+  Name,
+  EXTRACT(YEAR FROM created_at) AS year,
+  COUNT(ID) AS nb_click
+FROM cast_date
+GROUP BY Name, year
+--HAVING Name != 'story_link_clicked'pour BtoB ou HAVING Name = 'story_link_clicked' pour BtoC
