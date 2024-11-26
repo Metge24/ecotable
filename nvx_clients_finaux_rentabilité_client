@@ -1,0 +1,20 @@
+--Nombre de clients gagnés / Rentabilité client--
+
+--Calculer le nombre de résas via le site Ecotable--
+--Table Tracking Event--
+
+SELECT 
+  Params_____Link_Type,
+  COUNT(ID) AS nb_resa
+FROM `projet_ecotable.tracking_event`
+WHERE Params_____Link_Type = 'booking_url'
+GROUP BY Params_____Link_Type
+
+--Calculer le CA estimé -- 
+--Table Restaurants--
+
+SELECT ID, Name, Daily_Guests, Average_Ticket, (Daily_Guests * Average_Ticket) AS CA
+FROM `rare-array-437909-t3.projet_data_ecotable.Restaurants`
+
+
+
