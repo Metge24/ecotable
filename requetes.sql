@@ -165,3 +165,52 @@ WHERE resto.State = 'active')
 SELECT
   ROUND(COUNTIF(Params_____User_ID IS NOT NULL)/(COUNTIF(Params_____User_ID IS NULL)+COUNTIF(Params_____User_ID IS NOT NULL)),2) AS part_ressources
 FROM join_tables
+
+
+
+--calculer la rétention et le nombre de renouvellement--
+-- Calculer temps abonnement--
+WITH cleaned_date AS (SELECT
+  ID,
+  Company_ID,
+  State,
+  REGEXP_REPLACE(Valid_Until, r', \d{2}:\d{2}', '') AS cleaned_valid_until,
+  REGEXP_REPLACE(Created_At, r', \d{2}:\d{2}', '') AS cleaned_created_at
+FROM `agile-alignment-438607-u2.Ecotable_GB.Subscriptions`),
+
+cast_date AS (SELECT
+  ID,
+  Company_ID,
+  State,
+  CAST(cleaned_valid_until AS DATE FORMAT 'MONTH DD, YYYY') AS valid_until,
+  CAST(cleaned_created_at AS DATE FORMAT 'MONTH DD, YYYY') AS created_at
+FROM cleaned_date)
+
+SELECT
+  ID,
+  Company_ID,
+  State,
+  DATE_DIFF(valid_until,created_at,MONTH) AS temps_abonnement,
+  --calculer la rétention si >=12 temps abonnement, 13, ou 14--
+  CASE
+    WHEN DATE_DIFF(valid_until,created_at,MONTH) > 11 THEN 1
+    ELSE 0
+    END AS retention_12,
+  CASE
+    WHEN DATE_DIFF(valid_until,created_at,MONTH) > 12 THEN 1
+    ELSE 0
+    END AS retention_13,
+  CASE
+    WHEN DATE_DIFF(valid_until,created_at,MONTH) > 13 THEN 1
+    ELSE 0
+    END AS retention_14,
+  CASE
+    WHEN DATE_DIFF(valid_until,created_at,MONTH) > 48 THEN 4
+    WHEN DATE_DIFF(valid_until,created_at,MONTH) > 36 THEN 3
+    WHEN DATE_DIFF(valid_until,created_at,MONTH) > 24 THEN 2
+    WHEN DATE_DIFF(valid_until,created_at,MONTH) > 12 THEN 1
+    ELSE 0
+    END AS nb_renouvellement
+FROM cast_date
+--END--
+
