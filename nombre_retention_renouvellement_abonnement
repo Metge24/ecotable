@@ -58,3 +58,7 @@ SELECT
 FROM `agile-alignment-438607-u2.Ecotable_GB.Restaurants` AS RT
 LEFT JOIN `agile-alignment-438607-u2.Ecotable_GB.Companies` AS CT
 ON RT.Company_ID = CT.ID
+
+
+
+!!! Fichier Subscrition incomplet colonnes : Hubspot ID & Stripe ID. Possibilité de lier fichier Restaurant à Subscription avec "Hubspot ID" !!! 
