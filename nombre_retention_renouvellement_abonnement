@@ -43,3 +43,18 @@ SELECT
     END AS nb_renouvellement
 FROM cast_date
 --END--
+
+
+--Lier les tables pour étudier les types de clients fidèles--
+SELECT
+ RT.ID as Restaurant_id,
+ CT.ID as Company_id,
+ RT.Name as Restaurant_name,
+ RT.Daily_Guests,
+ RT.Average_Ticket,
+ RT.State,
+ RT.Segment_Type,
+ CT.Restaurants_Type as company_type
+FROM `agile-alignment-438607-u2.Ecotable_GB.Restaurants` AS RT
+LEFT JOIN `agile-alignment-438607-u2.Ecotable_GB.Companies` AS CT
+ON RT.Company_ID = CT.ID
