@@ -1,15 +1,15 @@
 --calculer la rétention et le nombre de renouvellement--
 -- Calculer temps abonnement--
 WITH cleaned_date AS (SELECT
-  ID,
+  ID AS subscription_ID,
   Company_ID,
   State,
   REGEXP_REPLACE(Valid_Until, r', \d{2}:\d{2}', '') AS cleaned_valid_until,
   REGEXP_REPLACE(Created_At, r', \d{2}:\d{2}', '') AS cleaned_created_at
-FROM `agile-alignment-438607-u2.Ecotable_GB.Subscriptions`),
+FROM `agile-alignment-438607-u2.Ecotable_GB.1_Subscriptions`),
 
 cast_date AS (SELECT
-  ID,
+  subscription_ID,
   Company_ID,
   State,
   CAST(cleaned_valid_until AS DATE FORMAT 'MONTH DD, YYYY') AS valid_until,
@@ -17,7 +17,7 @@ cast_date AS (SELECT
 FROM cleaned_date)
 
 SELECT
-  ID,
+  subscription_ID,
   Company_ID,
   State,
   DATE_DIFF(valid_until,created_at,MONTH) AS temps_abonnement,
