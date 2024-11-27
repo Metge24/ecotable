@@ -1,0 +1,113 @@
+--clean 1 : remplacer les valeurs abérantes par des dates normales--
+WITH cd0 AS (
+SELECT
+  ID AS subscription_ID,
+  Company_ID,
+  Plan,
+  State,
+  CASE
+    WHEN Valid_Until LIKE "%2121%" THEN replace(Valid_Until, "2121", "2021")
+    WHEN Valid_Until LIKE "%2122%" THEN replace(Valid_Until, "2122", "2022")
+    WHEN Valid_Until LIKE "%2123%" THEN replace(Valid_Until, "2123", "2023")
+    WHEN Valid_Until LIKE "%2124%" THEN replace(Valid_Until, "2124", "2024")
+    ELSE Valid_Until
+  END AS Valid_Until_2,
+  Created_At
+FROM `agile-alignment-438607-u2.Ecotable_GB.1_Subscriptions`),
+
+--clean 2 : mettre au bon format pour un Date type--
+cleaned_date AS (SELECT
+  subscription_ID,
+  Company_ID,
+  Plan,
+  State,
+  REGEXP_REPLACE(Valid_Until_2, r', \d{2}:\d{2}', '') AS cleaned_valid_until,
+  REGEXP_REPLACE(Created_At, r', \d{2}:\d{2}', '') AS cleaned_created_at
+FROM cd0),
+
+--clean 3 : transformer en Date type--
+cast_date AS (SELECT
+  subscription_ID,
+  Company_ID,
+  Plan,
+  State,
+  CAST(cleaned_valid_until AS DATE FORMAT 'MONTH DD, YYYY') AS valid_until,
+  CAST(cleaned_created_at AS DATE FORMAT 'MONTH DD, YYYY') AS created_at
+FROM cleaned_date)
+
+--calculer le nombre de mois d'abonnement, le renouvellement, et la rétention--
+SELECT
+  subscription_ID,
+  Company_ID,
+  Plan,
+  State,
+  DATE_DIFF(valid_until,created_at,MONTH) AS temps_abonnement,
+  --calculer la rétention si >=12 temps abonnement, 13, ou 14--
+  CASE
+    WHEN DATE_DIFF(valid_until,created_at,MONTH) > 11 THEN 1
+    ELSE 0
+    END AS retention_12,
+  CASE
+    WHEN DATE_DIFF(valid_until,created_at,MONTH) > 12 THEN 1
+    ELSE 0
+    END AS retention_13,
+  CASE
+    WHEN DATE_DIFF(valid_until,created_at,MONTH) > 13 THEN 1
+    ELSE 0
+    END AS retention_14,
+  CASE
+    WHEN DATE_DIFF(valid_until,created_at,MONTH) > 72 THEN 5
+    WHEN DATE_DIFF(valid_until,created_at,MONTH) > 60 THEN 5
+    WHEN DATE_DIFF(valid_until,created_at,MONTH) > 48 THEN 4
+    WHEN DATE_DIFF(valid_until,created_at,MONTH) > 36 THEN 3
+    WHEN DATE_DIFF(valid_until,created_at,MONTH) > 24 THEN 2
+    WHEN DATE_DIFF(valid_until,created_at,MONTH) > 12 THEN 1
+    ELSE 0
+    END AS nb_renouvellement
+FROM cast_date
+--END--
+
+
+--join Restaurants aux Companies pour plus de profondeur d'informations--
+WITH RCjoin AS (SELECT 
+ RT.ID as Restaurant_id,
+ CT.ID as Company_id,
+ RT.Name as Restaurant_name,
+ RT.Daily_Guests,
+ RT.Average_Ticket,
+ (RT.Daily_Guests * RT.Average_Ticket) AS turnover,
+ RT.Postcode,
+ RT.Denormalized_Plan_Size,
+ RT.Segment_Type AS Restaurant_type,
+ CT.Restaurants_Type as Company_type,
+ RT.State,
+FROM `agile-alignment-438607-u2.Ecotable_GB.1_Restaurants` AS RT
+LEFT JOIN `agile-alignment-438607-u2.Ecotable_GB.1_Companies` AS CT
+ON RT.Company_ID = CT.ID
+--On ne sélectionne que les restaurants ayant déjà eu un abonnement--
+WHERE State != "inactive")
+
+--On joint ces résultats au tableau 2_Fidelite--
+SELECT
+  subscription_ID AS Subscription_id,
+  RCjoin.Restaurant_id,
+  RCjoin.Company_id,
+  RCjoin.Restaurant_name,
+  RCjoin.Daily_Guests,
+  RCjoin.Average_Ticket,
+  RCjoin.turnover AS Turnover,
+  RCjoin.Postcode,
+  fidel.Plan,
+  RCjoin.Denormalized_Plan_Size,
+  RCjoin.Restaurant_type,
+  RCjoin.Company_type,
+  fidel.State,
+  fidel.temps_abonnement,
+  fidel.nb_renouvellement,
+  fidel.retention_12,
+  fidel.retention_13,
+  fidel.retention_14
+FROM RCjoin
+LEFT JOIN `agile-alignment-438607-u2.Ecotable_GB.2_Fidelite` AS fidel
+ON RCjoin.Company_id = fidel.Company_ID
+WHERE temps_abonnement IS NOT NULL
