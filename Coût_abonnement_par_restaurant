@@ -1,0 +1,19 @@
+--Calculer le coût de l'abonnement par restaurant--
+
+SELECT R.ID, R.Company_id, R.Daily_Guests, R.Average_Ticket, (R.Daily_Guests * R.Average_Ticket) AS CA, R.Denormalized_Plan_Size, S.Plan, R.Name, S.Amount, EXTRACT( YEAR FROM S.Created_At) AS Year_sub,
+CASE WHEN S.Plan = "light" THEN 400
+WHEN S.Plan = "standard" AND R.Denormalized_Plan_Size = "XS" THEN 700
+WHEN S.Plan = "standard" AND R.Denormalized_Plan_Size = "S" THEN 750
+WHEN S.Plan = "standard" AND R.Denormalized_Plan_Size = "M" THEN 1150
+WHEN S.Plan = "standard" AND R.Denormalized_Plan_Size = "L" THEN 1300
+WHEN S.Plan = "standard_plus" AND R.Denormalized_Plan_Size = "XS" THEN 1300
+WHEN S.Plan = "standard_plus" AND R.Denormalized_Plan_Size = "S" THEN 1400
+WHEN S.Plan = "standard_plus" AND R.Denormalized_Plan_Size = "M" THEN 1700
+WHEN S.Plan = "standard_plus" AND R.Denormalized_Plan_Size = "L" THEN 1900
+ELSE S.Amount 
+END AS prix_abonnement, 
+COUNT (Name) OVER(partition by Company_ID,Amount) AS nbre_restaurants
+FROM `rare-array-437909-t3.projet_data_ecotable.Subscription_all_vf` AS S
+left JOIN `rare-array-437909-t3.projet_data_ecotable.Restaurants_all` AS R 
+USING (company_id)
+WHERE R.ID IS NOT NULL 
