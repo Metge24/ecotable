@@ -17,4 +17,14 @@ SELECT ID, Name, Daily_Guests, Average_Ticket, (Daily_Guests * Average_Ticket) A
 FROM `rare-array-437909-t3.projet_data_ecotable.Restaurants`
 
 
+--Calculer le CA par jour, par an par restaurant (filtre possible sur les années de début d'abonnement = year_start_sub)
 
+WITH CA_day AS(SELECT company_id, R.ID, R.Name, R.Daily_Guests, R.Average_Ticket, (R.Daily_Guests * R.Average_Ticket) AS CA, R.Denormalized_Plan_Size, EXTRACT(YEAR FROM S.Created_At) AS year_start_sub
+FROM `rare-array-437909-t3.projet_data_ecotable.Restaurants_all` AS R
+LEFT JOIN `rare-array-437909-t3.projet_data_ecotable.Subscription_all_vf` AS S
+USING (Company_ID))
+
+
+SELECT Company_ID, ID, Name, year_start_sub, Denormalized_Plan_Size, Average_Ticket, Daily_Guests, ROUND((CA * 365),2) AS CA_per_year, CA AS CA_per_day
+FROM CA_day
+WHERE ID IS NOT NULL
