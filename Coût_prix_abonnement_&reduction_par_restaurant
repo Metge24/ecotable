@@ -1,0 +1,44 @@
+--Calculer le coût de l'abonnement par restaurant--
+
+SELECT R.ID, R.State, R.Company_id, R.Daily_Guests, R.Average_Ticket, (R.Daily_Guests * R.Average_Ticket) AS CA, R.Denormalized_Plan_Size, S.Plan, R.Name, S.Amount, EXTRACT( YEAR FROM S.Created_At) AS Year_sub, 
+CASE WHEN S.Plan = "light" THEN 400
+WHEN S.Plan = "standard" AND R.Denormalized_Plan_Size = "XS" THEN 700
+WHEN S.Plan = "standard" AND R.Denormalized_Plan_Size = "S" THEN 750
+WHEN S.Plan = "standard" AND R.Denormalized_Plan_Size = "M" THEN 1150
+WHEN S.Plan = "standard" AND R.Denormalized_Plan_Size = "L" THEN 1300
+WHEN S.Plan = "standard_plus" AND R.Denormalized_Plan_Size = "XS" THEN 1300
+WHEN S.Plan = "standard_plus" AND R.Denormalized_Plan_Size = "S" THEN 1400
+WHEN S.Plan = "standard_plus" AND R.Denormalized_Plan_Size = "M" THEN 1700
+WHEN S.Plan = "standard_plus" AND R.Denormalized_Plan_Size = "L" THEN 1900
+WHEN R.Denormalized_Plan_Size = "custom" AND S.Plan = "standard" THEN 1300
+WHEN R.Denormalized_Plan_Size = "custom" AND S.Plan = "standard_plus" THEN 1900
+ELSE S.Amount 
+END AS prix_abonnement, 
+COUNT (Name) OVER(partition by Company_ID,Amount) AS nbre_restaurants
+FROM `rare-array-437909-t3.projet_data_ecotable.Subscription_all_vf` AS S
+left JOIN `rare-array-437909-t3.projet_data_ecotable.Restaurants_all` AS R 
+USING (company_id)
+WHERE R.ID IS NOT NULL AND R.State != 'inactive'
+
+--Calculer la réduction effectuée entre le montant du devis (=amount) et le prix d'abonnement--
+-- Calcul de l'amount par restaurant (amount par E par défaut)--
+
+WITH amount_r AS (SELECT ID, State, Company_id, Daily_Guests, Nbre_restaurants, Average_Ticket, CA, Denormalized_Plan_Size, Plan, Name, Amount, Year_sub, (Amount - prix_abonnement) AS diff_prix_amount_E, 
+CASE WHEN Amount IS NULL THEN Prix_abonnement
+WHEN Amount = 0 THEN prix_abonnement 
+WHEN nbre_restaurants = 2 THEN Amount
+WHEN Company_ID = 3631 THEN ROUND((Amount / nbre_restaurants),2)
+WHEN Company_id = 2528 OR Company_id = 2063 OR Company_id = 2283 OR Company_id = 3109 OR Company_id = 3063 OR Company_id = 3364 OR Company_id = 2383 OR Company_id = 2286 OR Company_id = 2567 OR Company_id = 2129 OR Company_id = 2324 OR Company_id = 2812 OR Company_id = 2087 OR Company_id = 2239 OR Company_id = 2811 OR Company_id = 2705 OR Company_id = 2481 OR Company_id = 2100 OR Company_id = 2803 OR Company_id = 2946 OR Company_id = 2666 OR Company_id = 2125 OR Company_id = 3038 OR Company_id = 2964 OR Company_id = 2965 OR Company_id = 2796 OR Company_id = 2347 OR Company_id = 3117 OR Company_id = 2063 THEN Amount
+ELSE ROUND((Amount / nbre_restaurants),2)
+END AS Amount_restaurant, prix_abonnement
+FROM `rare-array-437909-t3.projet_data_ecotable.Prix_abonnement_restaurant_actif_29_11_10h30`),
+
+amount_r_bis AS(SELECT ID, Daily_Guests, Average_Ticket, CA, Denormalized_Plan_Size, Plan, Name, Year_sub, Amount, Amount_restaurant,
+prix_abonnement, ROUND((Amount_restaurant - prix_abonnement),2) AS diff_prix_amount_R, diff_prix_amount_E, Company_id, Nbre_restaurants, State, COUNT (Name) OVER(partition by Company_ID,Amount, Year_sub) AS nbre_restaurants_abonnes
+FROM amount_r)
+
+SELECT ID, Daily_Guests, Average_Ticket, CA, Denormalized_Plan_Size, Plan, Name, Year_sub, Amount, Amount_restaurant,
+prix_abonnement, diff_prix_amount_R, diff_prix_amount_E, Company_id, Nbre_restaurants, State, nbre_restaurants_abonnes
+FROM amount_r_bis
+WHERE Company_ID NOT IN (3063,2283, 2078, 3632, 3622, 3633, 3630, 3652, 3142, 2868, 3638, 3038,3108, 2100,3498, 2036)
+
