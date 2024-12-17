@@ -1,0 +1,67 @@
+WITH int_story AS (SELECT
+  CAST(Story_ID AS INT64) AS Story_ID,
+  SUM(click_resa) AS click_resa
+FROM `agile-alignment-438607-u2.Ecotable_GB.2_booking_story_id`
+GROUP BY Story_ID),
+
+j_storie AS (SELECT
+  s.Restaurant_ID,
+  SUM(bs.click_resa) AS click_resa
+FROM int_story AS bs
+LEFT JOIN `agile-alignment-438607-u2.Ecotable_GB.1_Stories` AS s
+ON bs.Story_ID = s.ID
+GROUP BY s.Restaurant_ID
+HAVING s.Restaurant_ID IS NOT NULL),
+
+j_restaurant AS (SELECT
+  j_storie.Restaurant_ID,
+  j_storie.click_resa,
+  r.Daily_Guests,
+  r.Average_Ticket,
+  (r.Daily_Guests * r.Average_Ticket) AS Daily_CA
+FROM j_storie
+LEFT JOIN `agile-alignment-438607-u2.Ecotable_GB.1_Restaurants` AS r
+ON j_storie.Restaurant_ID = r.ID),
+
+j_charge AS (SELECT
+  j_restaurant.Restaurant_ID,
+  j_restaurant.click_resa,
+  j_restaurant.Daily_Guests,
+  j_restaurant.Average_Ticket,
+  j_restaurant.Daily_CA,
+  char.Amount_restaurant AS Cout_abonnement_an
+FROM j_restaurant
+LEFT JOIN `agile-alignment-438607-u2.Ecotable_GB.2_Avg_charge_restaurant` as char
+ON j_restaurant.Restaurant_ID = char.ID),
+
+calc_kpi AS (SELECT
+  j_charge.Restaurant_ID,
+  j_charge.click_resa,
+  j_charge.Daily_Guests,
+  j_charge.Average_Ticket,
+  j_charge.Daily_CA,
+  ROUND(j_charge.Cout_abonnement_an,2) AS Cout_abonnement_an,
+  ta.temps_abonnement,
+  (j_charge.click_resa / ta.temps_abonnement) AS click_by_month,
+  (j_charge.click_resa * j_charge.Average_Ticket) AS max_CA_from_impact,
+  ROUND((j_charge.Cout_abonnement_an / 12 * ta.temps_abonnement),2) AS cout_abonnement_total,
+  ROUND((j_charge.click_resa * j_charge.Average_Ticket) - (j_charge.Cout_abonnement_an / 12 * ta.temps_abonnement),2) AS benefice,
+FROM j_charge
+LEFT JOIN `agile-alignment-438607-u2.Ecotable_GB.2_Temps_abo_restaurant` AS ta
+ON j_charge.Restaurant_ID = ta.Restaurant_id)
+
+SELECT
+  ck.Restaurant_ID,
+  sto.Label_Level,
+  ck.click_resa,
+  ck.Daily_Guests,
+  ck.Average_Ticket,
+  ck.Daily_CA,
+  ck.Cout_abonnement_an,
+  ck.temps_abonnement,
+  ck.max_CA_from_impact,
+  ck.cout_abonnement_total,
+  ck.benefice
+FROM calc_kpi AS ck
+LEFT JOIN `agile-alignment-438607-u2.Ecotable_GB.1_Stories` AS sto
+ON ck.Restaurant_ID = sto.Restaurant_ID
