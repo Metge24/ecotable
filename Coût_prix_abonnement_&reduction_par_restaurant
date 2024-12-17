@@ -21,7 +21,7 @@ USING (company_id)
 WHERE R.ID IS NOT NULL AND R.State != 'inactive'
 
 --Calculer la réduction effectuée entre le montant du devis (=amount) et le prix d'abonnement--
--- Calcul de l'amount par restaurant (amount par E par défaut)--
+-- Calcul de l'amount par restaurant (amount par E divisé par le nombre de restaurants par défaut - exclusion des E où la diff entre le prix de l'abonnement et le prix calculé sur devis est plus ou moins grand que 1000 euros)--
 
 WITH amount_r AS (SELECT ID, State, Company_id, Daily_Guests, Nbre_restaurants, Average_Ticket, CA, Denormalized_Plan_Size, Plan, Name, Amount, Year_sub, (Amount - prix_abonnement) AS diff_prix_amount_E, 
 CASE WHEN Amount IS NULL THEN Prix_abonnement
