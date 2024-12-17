@@ -1,0 +1,169 @@
+--Requête pour connaître l`utilisation de la plateforme Impact--
+
+--Jointure tables tracking event et user company pour savoir quelle entreprise a fait quel clic sur la plateforme--
+
+WITH join_cu AS (
+  SELECT
+    te.ID AS tracking_id,
+    te.created_at,
+    te.Params_User_ID AS user_id_events,
+    te.Name,
+    cu.User_ID AS user_id_company,
+    cu.Company_ID
+  FROM `ecotable_metabase.tracking_events_meta_no_admin` te
+  LEFT JOIN `ecotable_metabase.company_users_meta` cu
+  ON te.Params_User_ID = cu.User_ID
+  WHERE te.Name NOT IN ('story_link_clicked', 'lavazza_partnership', 'summer_referral_program') AND Company_ID IS NOT NULL
+),
+
+--Calcul du nombre total d`entreprises--                                                                                                                                 
+                                                                                                                                    
+nb_total_comp AS (
+  SELECT
+    Company_ID,
+    Plan,
+    Created_At,
+    Valid_Until,
+    COUNT (DISTINCT Company_ID) OVER () AS nb_comp_total
+  FROM `ecotable_metabase.subscriptions_meta`
+),
+
+--Jointure de la nouvelle table jointe avec la table subscription pour savoir quelle entreprise avec quel abonnement a fait quel clic sur la plateforme et calcul du nombre d entreprise qui a/a eu un abonnement--
+
+join_sub AS (
+  SELECT
+    jc.tracking_id,
+    CAST (jc.created_at AS DATE) AS event_created_at,
+    jc.user_id_events,
+    jc.user_id_company,
+    jc.Company_ID AS company_id_comp,
+    jc.Name AS event_name,
+    su.Company_ID AS company_id_sub,
+    COUNT (DISTINCT su.Company_ID) OVER () AS nb_comp,
+    su.nb_comp_total,
+    su.Plan,
+    CAST (su.Created_At AS DATE) AS subscription_created_at,
+    CAST (su.Valid_Until AS DATE) AS subscription_ended_at
+  FROM join_cu jc
+  LEFT JOIN nb_total_comp su
+  ON jc.Company_ID = su.Company_ID
+),
+
+--Jointure de la nouvelle table jointe avec la table restaurant pour avoir les informations de clics sur Impact réparties par restaurant, calcul de la date de premier abonnement et date de fin d abonnement, calcul du premier clic, du nombre de restaurant par entreprise et du nombre de clics par entreprise--
+
+join_resto AS (
+  SELECT
+    js.tracking_id,
+    js.company_id_sub,
+    MIN(js.subscription_created_at) OVER (PARTITION BY js.company_id_sub) AS first_subscription,
+    MAX(js.subscription_ended_at) OVER (PARTITION BY js.company_id_sub) AS end_subscription,
+    js.event_created_at,
+    MIN(js.event_created_at) OVER (PARTITION BY js.company_id_sub) AS first_comp_click,
+    js.event_name,
+    js.Plan,
+    js.nb_comp,
+    js.nb_comp_total,
+    rl.ID,
+    rl.Daily_Guests,
+    rl.Average_Ticket,
+    rl.Denormalized_Plan_Size AS plan_size,
+    rl.Denormalized_Resto_Score AS resto_score,
+    rl.Name AS resto_name,
+    rl.Company_id,
+    rl.State,
+    COUNT (DISTINCT Name) OVER(partition by Company_ID) AS nb_resto,
+    COUNT(js.tracking_id) OVER (PARTITION BY js.company_id_sub) AS nb_click_comp
+  FROM join_sub js
+  LEFT JOIN `ecotable_metabase.restaurants_meta` rl
+  ON js.company_id_sub = rl.Company_id
+  WHERE rl.State NOT IN ('inactive', 'deleted')
+),
+
+--Categorisation des différents types d`événements pour que ce soit regroupé et plus clair, jointure avec la table stories pour avoir les informations de macarons, calcul du nombre de jours entre l abonnement et le premier clic et de l ordre des clics--
+
+categ AS (SELECT
+  jr.tracking_id,
+  jr.company_id_sub,
+  jr.first_subscription,
+  jr.event_created_at,
+  jr.event_name,
+  CASE 
+    WHEN event_name = 'audit_form_submitted' THEN "Finalisation Audit"
+    WHEN event_name = 'banner_message_click' THEN "Click sur bannière"
+    WHEN event_name = 'cancellation' THEN "Modifications compte"
+    WHEN event_name = 'new_account_step_visited' THEN "Modifications compte"
+    WHEN event_name = 'practical_sheet_visit' THEN "Fiches pratiques"
+    WHEN event_name = 'resource_viewed' THEN "Ressources"
+    WHEN event_name = 'roadmap_assignment_updated' THEN "Plan d'action"
+    WHEN event_name = 'roadmap_deadline_updated' THEN "Plan d'action"
+    WHEN event_name = 'roadmap_viewed' THEN "Plan d'action"
+    WHEN event_name = 'service_providers_search' THEN "Recherche annuaire"
+    WHEN event_name = 'stripe_checkout' THEN "Finalisation inscription stripe"
+    WHEN event_name = 'stripe_checkout_practical_sheet' THEN "Fiches pratiques"
+    ELSE Null
+  END AS event_name_renamed,
+  jr.first_comp_click,
+  jr.Plan,
+  jr.ID AS resto_id,
+  jr.Daily_Guests*jr.Average_Ticket AS resto_ca,
+  jr.plan_size,
+  jr.resto_score,
+  jr.resto_name,
+  jr.Company_id,
+  jr.nb_resto,
+  jr.nb_click_comp,
+  jr.nb_click_comp/jr.nb_resto AS nb_click_resto,
+  jr.nb_comp,
+  jr.nb_comp_total,
+  st.Restaurant_ID,
+  st.Label_Level,
+  CASE
+    WHEN Label_level IS NULL THEN "sans macaron"
+    WHEN Label_level = 1 THEN "1"
+    WHEN Label_level = 2 THEN "2"
+    WHEN Label_level = 3 THEN "3"
+    ELSE Null
+  END AS label_categorie,
+  ROW_NUMBER() OVER (PARTITION BY jr.company_id_sub ORDER BY jr.first_comp_click ASC) AS rank_click,
+  DATE_DIFF(jr.first_comp_click,jr.first_subscription, DAY) AS nb_jours_entre_abo_first_click
+FROM join_resto jr
+LEFT JOIN `ecotable_metabase.stories_meta` st
+ON jr.ID = st.Restaurant_ID
+)
+
+--Table finale avec le regroupement de toutes les informations et categorisation du nombre de jours entre abonnement et premier clic sur la plateforme--
+
+SELECT
+  tracking_id,
+  company_id_sub,
+  first_subscription,
+  event_created_at,
+  event_name,
+  event_name_renamed,
+  first_comp_click,
+  Plan,
+  resto_id,
+  resto_ca,
+  plan_size,
+  resto_score,
+  resto_name,
+  Company_id,
+  nb_resto,
+  nb_click_comp,
+  nb_click_resto,
+  nb_comp,
+  nb_comp_total,
+  Restaurant_ID,
+  Label_Level,
+  label_categorie,
+  rank_click,
+  nb_jours_entre_abo_first_click,
+  CASE 
+    WHEN nb_jours_entre_abo_first_click >365 THEN "plus d'un an"
+    WHEN nb_jours_entre_abo_first_click >30 THEN "plus d'un mois"
+    WHEN nb_jours_entre_abo_first_click >1 THEN "plus d'un jour"
+    WHEN nb_jours_entre_abo_first_click =1 THEN "un jour après"
+    WHEN nb_jours_entre_abo_first_click = 0 THEN "jour de l'inscription"
+    ELSE "avant inscription"
+  END AS frequence_first_click
+FROM categ
