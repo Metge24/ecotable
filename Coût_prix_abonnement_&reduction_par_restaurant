@@ -1,4 +1,5 @@
 --Calculer le coût de l'abonnement par restaurant--
+--Table Subscription & Table Restaurants --
 
 SELECT R.ID, R.State, R.Company_id, R.Daily_Guests, R.Average_Ticket, (R.Daily_Guests * R.Average_Ticket) AS CA, R.Denormalized_Plan_Size, S.Plan, R.Name, S.Amount, EXTRACT( YEAR FROM S.Created_At) AS Year_sub, 
 CASE WHEN S.Plan = "light" THEN 400
