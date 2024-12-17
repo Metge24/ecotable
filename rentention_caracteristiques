@@ -1,0 +1,43 @@
+--join Restaurants aux Companies pour plus de profondeur d'informations--
+WITH RCjoin AS (SELECT 
+ RT.ID as Restaurant_id,
+ CT.ID as Company_id,
+ RT.Name as Restaurant_name,
+ RT.Daily_Guests,
+ RT.Average_Ticket,
+ (RT.Daily_Guests * RT.Average_Ticket) AS turnover,
+ RT.Postcode,
+ RT.Denormalized_Plan_Size,
+ RT.Segment_Type AS Restaurant_type,
+ CT.Restaurants_Type as Company_type,
+ RT.State,
+FROM `agile-alignment-438607-u2.Ecotable_GB.1_Restaurants` AS RT
+LEFT JOIN `agile-alignment-438607-u2.Ecotable_GB.1_Companies` AS CT
+ON RT.Company_ID = CT.ID
+--On ne sélectionne que les restaurants ayant déjà eu un abonnement--
+WHERE State != "inactive")
+
+--On joint ces résultats au tableau 2_Fidelite--
+SELECT
+  subscription_ID AS Subscription_id,
+  RCjoin.Restaurant_id,
+  RCjoin.Company_id,
+  RCjoin.Restaurant_name,
+  RCjoin.Daily_Guests,
+  RCjoin.Average_Ticket,
+  RCjoin.turnover AS Turnover,
+  RCjoin.Postcode,
+  fidel.Plan,
+  RCjoin.Denormalized_Plan_Size,
+  RCjoin.Restaurant_type,
+  RCjoin.Company_type,
+  fidel.State,
+  fidel.temps_abonnement,
+  fidel.nb_renouvellement,
+  fidel.retention_12,
+  fidel.retention_13,
+  fidel.retention_14
+FROM RCjoin
+LEFT JOIN `agile-alignment-438607-u2.Ecotable_GB.2_Fidelite` AS fidel
+ON RCjoin.Company_id = fidel.Company_ID
+WHERE temps_abonnement IS NOT NULL
